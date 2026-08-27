@@ -35,37 +35,38 @@ export function useDetail<T>(
 
 export function useCreate<TData, TVariables>(
   endpoint: string,
-  options?: UseMutationOptions<TData, Error, TVariables>
+  options?: UseMutationOptions<TData, Error, TVariables, unknown>
 ) {
   const queryClient = useQueryClient()
   
-  return useMutation<TData, Error, TVariables>({
+  return useMutation<TData, Error, TVariables, unknown>({
     mutationFn: async (data) => {
-      const response = await api.post(endpoint, data)
+      const response = await api.post(endpoint, data as any)
       return response.data
     },
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: [endpoint] })
-      options?.onSuccess?.(data, variables, context)
+      options?.onSuccess?.(data, variables, context as any)
     },
     ...options,
   })
 }
 
-export function useUpdate<TData, TVariables>(
+export function useUpdate<TData, TVariables extends { id: string | number }>(
   endpoint: string,
-  options?: UseMutationOptions<TData, Error, TVariables>
+  options?: UseMutationOptions<TData, Error, TVariables, unknown>
 ) {
   const queryClient = useQueryClient()
   
-  return useMutation<TData, Error, TVariables>({
-    mutationFn: async ({ id, ...data }) => {
+  return useMutation<TData, Error, TVariables, unknown>({
+    mutationFn: async (variables) => {
+      const { id, ...data } = variables as any
       const response = await api.patch(`${endpoint}${id}/`, data)
       return response.data
     },
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: [endpoint] })
-      options?.onSuccess?.(data, variables, context)
+      options?.onSuccess?.(data, variables, context as any)
     },
     ...options,
   })
@@ -73,18 +74,18 @@ export function useUpdate<TData, TVariables>(
 
 export function useDelete<TData>(
   endpoint: string,
-  options?: UseMutationOptions<TData, Error, string | number>
+  options?: UseMutationOptions<TData, Error, string | number, unknown>
 ) {
   const queryClient = useQueryClient()
   
-  return useMutation<TData, Error, string | number>({
+  return useMutation<TData, Error, string | number, unknown>({
     mutationFn: async (id) => {
       const response = await api.delete(`${endpoint}${id}/`)
       return response.data
     },
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: [endpoint] })
-      options?.onSuccess?.(data, variables, context)
+      options?.onSuccess?.(data, variables, context as any)
     },
     ...options,
   })
@@ -93,18 +94,18 @@ export function useDelete<TData>(
 export function useCustomMutation<TData, TVariables>(
   endpoint: string,
   method: 'post' | 'put' | 'patch' | 'delete' = 'post',
-  options?: UseMutationOptions<TData, Error, TVariables>
+  options?: UseMutationOptions<TData, Error, TVariables, unknown>
 ) {
   const queryClient = useQueryClient()
   
-  return useMutation<TData, Error, TVariables>({
+  return useMutation<TData, Error, TVariables, unknown>({
     mutationFn: async (data) => {
-      const response = await api[method](endpoint, data)
+      const response = await (api as any)[method](endpoint, data)
       return response.data
     },
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: [endpoint.split('/')[0]] })
-      options?.onSuccess?.(data, variables, context)
+      options?.onSuccess?.(data, variables, context as any)
     },
     ...options,
   })
