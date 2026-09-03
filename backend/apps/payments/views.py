@@ -35,25 +35,43 @@ class PaymentViewSet(viewsets.ModelViewSet):
         # Filter by student class
         student_class = self.request.query_params.get('class')
         if student_class:
-            queryset = queryset.filter(student__student_class=student_class)
+            try:
+                sc = int(student_class)
+                queryset = queryset.filter(student__student_class=sc)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         # Filter by batch
         batch_id = self.request.query_params.get('batch')
         if batch_id:
-            queryset = queryset.filter(student__batch_id=batch_id)
+            try:
+                bid = int(batch_id)
+                queryset = queryset.filter(student__batch_id=bid)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         return queryset
 
     @action(detail=False, methods=['get'])
     def student_detail(self, request):
         student_id = request.query_params.get('student_id')
-        year = request.query_params.get('year', datetime.now().year)
+        year_param = request.query_params.get('year', str(datetime.now().year))
         
         if not student_id:
             return Response({'detail': 'student_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate student_id is integer
+        try:
+            sid = int(student_id)
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid student_id'}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate year
+        try:
+            year = int(year_param)
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid year parameter'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            student = Student.objects.get(id=student_id, is_active=True)
+            student = Student.objects.get(id=sid, is_active=True)
         except Student.DoesNotExist:
             return Response({'detail': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
         

@@ -35,11 +35,19 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         
         student_class = self.request.query_params.get('class')
         if student_class:
-            queryset = queryset.filter(student__student_class=student_class)
+            try:
+                sc = int(student_class)
+                queryset = queryset.filter(student__student_class=sc)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         batch_id = self.request.query_params.get('batch')
         if batch_id:
-            queryset = queryset.filter(student__batch_id=batch_id)
+            try:
+                bid = int(batch_id)
+                queryset = queryset.filter(student__batch_id=bid)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
@@ -198,8 +206,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Not a student account'}, status=status.HTTP_403_FORBIDDEN)
         
         student = request.user.student
-        year = int(request.query_params.get('year', date.today().year))
-        month = int(request.query_params.get('month', date.today().month))
+        try:
+            year = int(request.query_params.get('year', date.today().year))
+            month = int(request.query_params.get('month', date.today().month))
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid year or month parameter'}, status=status.HTTP_400_BAD_REQUEST)
+        if not 2000 <= year <= 2100 or not 1 <= month <= 12:
+            return Response({'detail': 'Year or month out of range'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Get first day of month and last day
         first_day = date(year, month, 1)
@@ -233,7 +246,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Not a student account'}, status=status.HTTP_403_FORBIDDEN)
         
         student = request.user.student
-        year = int(request.query_params.get('year', date.today().year))
+        try:
+            year = int(request.query_params.get('year', date.today().year))
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid year parameter'}, status=status.HTTP_400_BAD_REQUEST)
+        if not 2000 <= year <= 2100:
+            return Response({'detail': 'Year out of range'}, status=status.HTTP_400_BAD_REQUEST)
         
         start_date = date(year, 1, 1)
         end_date = date(year, 12, 31)
@@ -268,7 +286,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         """Get attendance statistics for a class/batch"""
         student_class = request.query_params.get('class')
         batch_id = request.query_params.get('batch')
-        year = int(request.query_params.get('year', date.today().year))
+        try:
+            year = int(request.query_params.get('year', date.today().year))
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid year parameter'}, status=status.HTTP_400_BAD_REQUEST)
+        if not 2000 <= year <= 2100:
+            return Response({'detail': 'Year out of range'}, status=status.HTTP_400_BAD_REQUEST)
         
         if not student_class:
             return Response({'detail': 'class parameter required'}, status=status.HTTP_400_BAD_REQUEST)

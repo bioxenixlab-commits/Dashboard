@@ -97,10 +97,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await studentLoginMutation.mutateAsync(credentials)
   }
 
-  const logout = () => {
-    clearAuthTokens()
-    setUser(null)
-    setStudent(null)
+  const logout = async () => {
+    const refresh = localStorage.getItem('refresh_token')
+    try {
+      // Determine logout endpoint based on role
+      const isStudent = user?.role === 'student' || !!student
+      const endpoint = isStudent ? '/auth/student/logout/' : '/auth/teacher/logout/'
+      if (refresh) {
+        await api.post(endpoint, { refresh })
+      }
+    } catch {
+      // ignore blacklist failure, still clear local tokens
+    } finally {
+      clearAuthTokens()
+      setUser(null)
+      setStudent(null)
+    }
   }
 
   const refreshUser = async () => {

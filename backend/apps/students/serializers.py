@@ -23,7 +23,7 @@ class StudentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'student_id', 'name', 'phone', 'student_class', 'student_class_display',
             'roll', 'ssc_session', 'batch', 'batch_id', 'payment_start_month',
-            'payment_start_year', 'password', 'address', 'parent_name', 'parent_phone',
+            'payment_start_year', 'address', 'parent_name', 'parent_phone',
             'date_added', 'is_active', 'unpaid_months_count', 'overall_percentage'
         ]
         read_only_fields = ['id', 'student_id', 'date_added', 'unpaid_months_count', 'overall_percentage']
@@ -46,7 +46,7 @@ class StudentListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'student_id', 'name', 'phone', 'student_class', 'student_class_display',
             'roll', 'ssc_session', 'batch', 'batch_id', 'payment_start_month',
-            'payment_start_year', 'password', 'is_active'
+            'payment_start_year', 'is_active'
         ]
 
 

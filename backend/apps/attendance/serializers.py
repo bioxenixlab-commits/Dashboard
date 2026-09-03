@@ -37,9 +37,14 @@ class AttendanceCreateSerializer(serializers.Serializer):
 
 class AttendanceBulkCreateSerializer(serializers.Serializer):
     date = serializers.DateField(default=date.today)
-    records = serializers.ListField(child=AttendanceCreateSerializer())
+    records = serializers.ListField(child=AttendanceCreateSerializer(), max_length=100, allow_empty=False)
     student_class = serializers.IntegerField(required=False)
     batch_id = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate_records(self, value):
+        if len(value) > 100:
+            raise serializers.ValidationError("Too many records (max 100).")
+        return value
 
 
 class AttendanceSessionSerializer(serializers.ModelSerializer):

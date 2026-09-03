@@ -46,10 +46,17 @@ class PaymentStudentDetailSerializer(serializers.Serializer):
 
 
 class PaymentBulkUpdateSerializer(serializers.Serializer):
-    payment_ids = serializers.ListField(child=serializers.IntegerField())
+    payment_ids = serializers.ListField(child=serializers.IntegerField(), max_length=100, allow_empty=False)
     is_paid = serializers.BooleanField()
-    amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, min_value=0)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_payment_ids(self, value):
+        if len(value) > 100:
+            raise serializers.ValidationError("Too many payment IDs (max 100).")
+        if len(set(value)) != len(value):
+            raise serializers.ValidationError("Duplicate payment IDs not allowed.")
+        return value
 
 
 class PaymentUnpaidStudentsSerializer(serializers.Serializer):

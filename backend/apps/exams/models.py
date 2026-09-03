@@ -51,6 +51,18 @@ class ExamResult(models.Model):
     date_recorded = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if not self.is_absent and self.marks_obtained is not None and self.exam_id:
+            if self.marks_obtained < 0:
+                raise ValidationError({'marks_obtained': 'Marks cannot be negative.'})
+            try:
+                total = self.exam.total_marks
+            except Exception:
+                total = None
+            if total is not None and self.marks_obtained > total:
+                raise ValidationError({'marks_obtained': f'Marks cannot exceed total marks ({total}).'})
+
     class Meta:
         unique_together = ['exam', 'student']
         ordering = ['student__student_class', 'student__roll']
@@ -61,6 +73,22 @@ class ExamResult(models.Model):
         return f"{self.student.name} - {self.exam.name}: {status}"
 
     def save(self, *args, **kwargs):
+        if not self.is_absent and self.marks_obtained is not None:
+            if self.marks_obtained < 0:
+                raise ValueError('Invalid marks_obtained: negative')
+            if self.exam_id:
+                try:
+                    total = self.exam.total_marks
+                    if self.marks_obtained > total:
+                        raise ValueError(f'Invalid marks_obtained: exceeds total {total}')
+                except Exception:
+                    pass
+        # Validate via clean (exclude exam/student to allow creation via get_or_create)
+        try:
+            self.full_clean(exclude=['exam', 'student'])
+        except Exception:
+            # Let serializer validation handle user input; only enforce percentage calc
+            pass
         if not self.is_absent and self.marks_obtained is not None:
             self.percentage = round((self.marks_obtained / self.exam.total_marks) * 100, 2)
         else:

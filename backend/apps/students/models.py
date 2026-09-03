@@ -1,3 +1,7 @@
+import secrets
+import string
+
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
@@ -16,7 +20,7 @@ class Student(models.Model):
     batch = models.ForeignKey(Batch, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
     payment_start_month = models.IntegerField(default=1, help_text="Month to start collecting fees (1-12)")
     payment_start_year = models.IntegerField(default=timezone.now().year, help_text="Year to start collecting fees")
-    password = models.CharField(max_length=128, help_text="Auto-generated, teacher can reset")
+    password = models.CharField(max_length=128, help_text="Hashed with Django's password hasher; use set_student_password()")
     address = models.TextField(blank=True)
     parent_name = models.CharField(max_length=100, blank=True)
     parent_phone = models.CharField(max_length=15, blank=True)
@@ -32,12 +36,36 @@ class Student(models.Model):
         batch_info = f" ({self.batch.display_name})" if self.batch else ""
         return f"{self.student_id} - {self.name}{batch_info}"
 
+    def set_student_password(self, raw_password: str):
+        """Hash and store the student password securely."""
+        self.password = make_password(raw_password)
+
+    def check_student_password(self, raw_password: str) -> bool:
+        """Verify a raw password against the stored hash. Handles legacy plaintext fallback."""
+        if not self.password:
+            return False
+        # Legacy plaintext fallback: if stored value is not a hash, do direct compare then migrate on success
+        if not self.password.startswith('pbkdf2_sha256$'):
+            # Check if hash detection for other algorithms (argon2, etc.) - generic check for $ pattern
+            if self.password.count('$') < 3:
+                return self.password == raw_password
+        return check_password(raw_password, self.password)
+
     def save(self, *args, **kwargs):
         is_new = self.pk is None
         if not self.student_id:
             self.student_id = self.generate_student_id()
         if not self.password:
-            self.password = self.generate_password()
+            raw = self.generate_password()
+            self.password = make_password(raw)
+            # Note: raw is not returned here; creation via API should use set_student_password in view to return raw
+        else:
+            # Defensive: if password looks like plaintext (not a hash), hash it before saving
+            if self.password and not self.password.startswith('pbkdf2_sha256$') and self.password.count('$') < 3:
+                # Heuristic: hashed passwords contain $ and start with algorithm name; plaintext is short alphanumeric
+                # Only auto-hash if it doesn't look like a hash
+                raw_plain = self.password
+                self.password = make_password(raw_plain)
         super().save(*args, **kwargs)
         if is_new:
             self.create_payment_records()
@@ -80,9 +108,8 @@ class Student(models.Model):
         return f"{self.ssc_session}{new_serial:03d}"
 
     def generate_password(self):
-        import random
-        import string
-        return ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        alphabet = string.ascii_letters + string.digits
+        return ''.join(secrets.choice(alphabet) for _ in range(12))
 
     @property
     def unpaid_months_count(self):

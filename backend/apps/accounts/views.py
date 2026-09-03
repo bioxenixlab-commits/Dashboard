@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.contrib.auth import authenticate
@@ -25,8 +26,13 @@ from apps.homework.models import Homework
 User = get_user_model()
 
 
+class LoginRateThrottle(AnonRateThrottle):
+    scope = 'login'
+
+
 class TeacherAuthViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     @action(detail=False, methods=['post'])
     def login(self, request):
@@ -53,6 +59,13 @@ class TeacherAuthViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def logout(self, request):
+        refresh_token = request.data.get('refresh')
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                pass
         return Response({'detail': 'Logged out successfully'})
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
@@ -62,6 +75,7 @@ class TeacherAuthViewSet(viewsets.ViewSet):
 
 class StudentAuthViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     @action(detail=False, methods=['post'])
     def login(self, request):
@@ -75,13 +89,13 @@ class StudentAuthViewSet(viewsets.ViewSet):
             )
         except Student.DoesNotExist:
             return Response(
-                {'detail': 'Student not found'},
+                {'detail': 'Invalid credentials'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
-        if student.password != serializer.validated_data['password']:
+        if not student.check_student_password(serializer.validated_data['password']):
             return Response(
-                {'detail': 'Invalid password'},
+                {'detail': 'Invalid credentials'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
@@ -106,6 +120,13 @@ class StudentAuthViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def logout(self, request):
+        refresh_token = request.data.get('refresh')
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                pass
         return Response({'detail': 'Logged out successfully'})
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
@@ -213,7 +234,13 @@ class StudentAuthViewSet(viewsets.ViewSet):
             return Response({'detail': 'Not a student account'}, status=status.HTTP_403_FORBIDDEN)
         
         student = request.user.student
-        year = int(request.query_params.get('year', datetime.now().year))
+        year_param = request.query_params.get('year', str(datetime.now().year))
+        try:
+            year = int(year_param)
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid year parameter'}, status=status.HTTP_400_BAD_REQUEST)
+        if not 2000 <= year <= 2100:
+            return Response({'detail': 'Year out of range'}, status=status.HTTP_400_BAD_REQUEST)
         
         payments = []
         start_month = student.payment_start_month

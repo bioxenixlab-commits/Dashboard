@@ -34,15 +34,23 @@ class StudentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         
-        # Filter by class
+        # Filter by class (validate integer, ignore invalid to avoid 500)
         student_class = self.request.query_params.get('class')
         if student_class:
-            queryset = queryset.filter(student_class=student_class)
+            try:
+                sc = int(student_class)
+                queryset = queryset.filter(student_class=sc)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         # Filter by batch
         batch_id = self.request.query_params.get('batch')
         if batch_id:
-            queryset = queryset.filter(batch_id=batch_id)
+            try:
+                bid = int(batch_id)
+                queryset = queryset.filter(batch_id=bid)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         # Global search
         search = self.request.query_params.get('search')
@@ -55,12 +63,28 @@ class StudentViewSet(viewsets.ModelViewSet):
         
         return queryset
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # Generate secure temporary password for new student
+        temp_student = Student(**{k: v for k, v in serializer.validated_data.items() if k != 'batch'})
+        # Handle batch separately if present
+        raw = temp_student.generate_password()
+        student = serializer.save()
+        student.set_student_password(raw)
+        student.save(update_fields=['password'])
+        headers = self.get_success_headers(serializer.data)
+        data = StudentSerializer(student).data
+        data['new_password'] = raw
+        return Response(data, status=status.HTTP_201_CREATED, headers=headers)
+
     @action(detail=True, methods=['post'])
     def reset_password(self, request, pk=None):
         student = self.get_object()
-        student.password = student.generate_password()
-        student.save()
-        return Response({'new_password': student.password})
+        raw = student.generate_password()
+        student.set_student_password(raw)
+        student.save(update_fields=['password'])
+        return Response({'new_password': raw})
 
     @action(detail=False, methods=['get'])
     def search(self, request):
@@ -107,12 +131,34 @@ class StudentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def bulk_delete(self, request):
         ids = request.data.get('ids', [])
-        Student.objects.filter(id__in=ids).update(is_active=False)
+        if not isinstance(ids, list):
+            return Response({'detail': 'ids must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(ids) > 100:
+            return Response({'detail': 'Too many IDs (max 100)'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(ids) == 0:
+            return Response({'detail': 'ids list is empty'}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate all are ints
+        try:
+            ids = [int(i) for i in ids]
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid IDs'}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            Student.objects.filter(id__in=ids).update(is_active=False)
         return Response({'detail': f'{len(ids)} students deactivated'})
 
     @action(detail=False, methods=['post'])
     def bulk_update_batch(self, request):
         ids = request.data.get('ids', [])
+        if not isinstance(ids, list):
+            return Response({'detail': 'ids must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(ids) > 100:
+            return Response({'detail': 'Too many IDs (max 100)'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(ids) == 0:
+            return Response({'detail': 'ids list is empty'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            ids = [int(i) for i in ids]
+        except (ValueError, TypeError):
+            return Response({'detail': 'Invalid IDs'}, status=status.HTTP_400_BAD_REQUEST)
         batch_id = request.data.get('batch_id')
         
         if batch_id:
@@ -123,5 +169,6 @@ class StudentViewSet(viewsets.ModelViewSet):
         else:
             batch = None
         
-        updated = Student.objects.filter(id__in=ids).update(batch=batch)
+        with transaction.atomic():
+            updated = Student.objects.filter(id__in=ids).update(batch=batch)
         return Response({'detail': f'{updated} students updated'})

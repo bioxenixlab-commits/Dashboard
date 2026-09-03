@@ -325,7 +325,7 @@ export function BatchesTab() {
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingBatch(null); }}
         batch={editingBatch}
-        onSubmit={editingBatch ? updateMutation.mutate : createMutation.mutate}
+        onSubmit={(data) => editingBatch ? updateMutation.mutate({ id: editingBatch.id, data }) : createMutation.mutate(data)}
         isLoading={createMutation.isPending || updateMutation.isPending}
       />
 

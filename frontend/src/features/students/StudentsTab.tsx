@@ -75,12 +75,18 @@ export function StudentsTab() {
       const response = await api.post('/students/', data)
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['students'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       toastSuccess('Student added successfully')
       setIsModalOpen(false)
       setEditingStudent(null)
+      if (data?.new_password) {
+        // Show newly generated password once
+        const studentName = data.name || 'New Student'
+        const studentCode = data.student_id || ''
+        setResetResult({ student: { id: data.id, name: studentName, student_id: studentCode } as Student, password: data.new_password })
+      }
     },
     onError: (error: any) => {
       const msg = error.response?.data ? JSON.stringify(error.response.data) : error.message
@@ -120,15 +126,18 @@ export function StudentsTab() {
     onError: (error: Error) => toastError(error.message),
   })
 
+  const [resetResult, setResetResult] = useState<{ student: Student; password: string } | null>(null)
+
   // Reset password mutation
   const resetPasswordMutation = useMutation({
     mutationFn: async (id: number) => {
       const response = await api.post(`/students/${id}/reset_password/`)
       return response.data
     },
-    onSuccess: (data) => {
+    onSuccess: (data, studentId) => {
       queryClient.invalidateQueries({ queryKey: ['students'] })
-      toastSuccess(`Password reset: ${data.new_password}`)
+      const student = studentsData?.results?.find((s: Student) => s.id === studentId) || { id: studentId, name: 'Student' } as Student
+      setResetResult({ student, password: data.new_password })
     },
     onError: (error: Error) => toastError(error.message),
   })
@@ -184,13 +193,6 @@ export function StudentsTab() {
         <span className="text-sm">
           {getMonthName(student.payment_start_month)} {student.payment_start_year}
         </span>
-      )
-    },
-    { 
-      key: 'password', 
-      header: 'Password',
-      render: (student: Student) => (
-        <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{student.password}</code>
       )
     },
     {
@@ -325,6 +327,38 @@ export function StudentsTab() {
         variant="danger"
         loading={deleteMutation.isPending}
       />
+
+      {/* Reset Password Result Modal - plaintext shown once */}
+      <Modal
+        isOpen={!!resetResult}
+        onClose={() => setResetResult(null)}
+        title="Password Reset Successful"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Temporary password for <span className="font-medium">{resetResult?.student.name}</span> ({resetResult?.student.student_id}):
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-gray-100 px-3 py-2 rounded text-sm font-mono break-all">{resetResult?.password}</code>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (resetResult?.password) {
+                  navigator.clipboard.writeText(resetResult.password)
+                  toastSuccess('Copied to clipboard')
+                }
+              }}
+            >
+              Copy
+            </Button>
+          </div>
+          <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">Copy now — this password will not be shown again. Communicate it securely to the student.</p>
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setResetResult(null)}>Close</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

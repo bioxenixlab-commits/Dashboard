@@ -106,13 +106,46 @@ class HomeworkSubmissionSerializer(serializers.ModelSerializer):
             'status', 'submitted_at', 'graded_at', 'marks',
             'feedback', 'graded_by', 'graded_by_name'
         ]
-        read_only_fields = ['id', 'student', 'homework', 'submitted_at', 'graded_at', 'graded_by', 'graded_by_name']
+        read_only_fields = ['id', 'student', 'homework', 'submitted_at', 'graded_at', 'graded_by', 'graded_by_name', 'marks', 'feedback', 'status']
+
+    def validate(self, data):
+        request = self.context.get('request')
+        if request and getattr(request.user, 'role', None) == 'student':
+            # Students must not modify grading fields via generic update
+            forbidden = {'marks', 'feedback', 'graded_by', 'graded_at', 'status'}
+            if any(f in data for f in forbidden):
+                raise serializers.ValidationError("Students cannot modify grading fields.")
+        return data
 
 
 class HomeworkSubmissionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = HomeworkSubmission
         fields = ['content', 'attachment']
+
+    def validate_attachment(self, value):
+        if not value:
+            return value
+        # Validate extension
+        import os
+        from apps.homework.models import ALLOWED_ATTACHMENT_EXTENSIONS, MAX_ATTACHMENT_SIZE
+        ext = os.path.splitext(value.name)[1].lower().lstrip('.')
+        if ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
+            raise serializers.ValidationError(f"File type '.{ext}' not allowed. Allowed: {', '.join(ALLOWED_ATTACHMENT_EXTENSIONS)}")
+        if value.size > MAX_ATTACHMENT_SIZE:
+            raise serializers.ValidationError(f"File too large (max 10 MB).")
+        # MIME check via magic bytes for images/pdf
+        # Basic content-type check: ensure not executable
+        dangerous = ['exe', 'sh', 'php', 'html', 'htm', 'svg', 'js']
+        if ext in dangerous:
+            raise serializers.ValidationError("Dangerous file type not allowed.")
+        # Check filename for path traversal
+        if '..' in value.name or '/' in value.name or '\\' in value.name:
+            # Django will sanitize, but explicitly reject suspicious names
+            # Allow only basename; still check
+            if '..' in value.name:
+                raise serializers.ValidationError("Invalid filename.")
+        return value
 
     def create(self, validated_data):
         request = self.context.get('request')

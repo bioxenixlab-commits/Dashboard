@@ -34,11 +34,19 @@ class HomeworkViewSet(viewsets.ModelViewSet):
         
         student_class = self.request.query_params.get('class')
         if student_class:
-            queryset = queryset.filter(student_class=student_class)
+            try:
+                sc = int(student_class)
+                queryset = queryset.filter(student_class=sc)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         batch_id = self.request.query_params.get('batch')
         if batch_id:
-            queryset = queryset.filter(batch_id=batch_id)
+            try:
+                bid = int(batch_id)
+                queryset = queryset.filter(batch_id=bid)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         return queryset
 
@@ -101,6 +109,11 @@ class HomeworkSubmissionViewSet(viewsets.ModelViewSet):
     filterset_fields = ['homework', 'student', 'status']
     ordering = ['-submitted_at']
 
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), IsTeacher()]
+        return [IsAuthenticated()]
+
     def get_serializer_class(self):
         if self.action == 'create':
             return HomeworkSubmissionCreateSerializer
@@ -135,6 +148,19 @@ class HomeworkSubmissionViewSet(viewsets.ModelViewSet):
         if homework.batch and homework.batch != request.user.student.batch:
             return Response({'detail': 'Not eligible for this homework'}, status=status.HTTP_403_FORBIDDEN)
         
+        # Validate attachment if present
+        attachment = request.FILES.get('attachment')
+        if attachment:
+            import os
+            from apps.homework.models import ALLOWED_ATTACHMENT_EXTENSIONS, MAX_ATTACHMENT_SIZE
+            ext = os.path.splitext(attachment.name)[1].lower().lstrip('.')
+            if ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
+                return Response({'detail': f"File type '.{ext}' not allowed. Allowed: {', '.join(ALLOWED_ATTACHMENT_EXTENSIONS)}"}, status=status.HTTP_400_BAD_REQUEST)
+            if attachment.size > MAX_ATTACHMENT_SIZE:
+                return Response({'detail': 'File too large (max 10 MB).'}, status=status.HTTP_400_BAD_REQUEST)
+            if '..' in attachment.name:
+                return Response({'detail': 'Invalid filename.'}, status=status.HTTP_400_BAD_REQUEST)
+
         submission, created = HomeworkSubmission.objects.get_or_create(
             homework=homework,
             student=request.user.student,
@@ -142,6 +168,7 @@ class HomeworkSubmissionViewSet(viewsets.ModelViewSet):
                 'content': request.data.get('content', ''),
                 'status': 'submitted',
                 'submitted_at': timezone.now(),
+                'attachment': attachment,
             }
         )
         
@@ -149,8 +176,8 @@ class HomeworkSubmissionViewSet(viewsets.ModelViewSet):
             submission.content = request.data.get('content', submission.content)
             submission.status = 'submitted'
             submission.submitted_at = timezone.now()
-            if 'attachment' in request.FILES:
-                submission.attachment = request.FILES['attachment']
+            if attachment:
+                submission.attachment = attachment
             submission.save()
         
         serializer = HomeworkSubmissionSerializer(submission)

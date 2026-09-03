@@ -36,11 +36,19 @@ class ExamViewSet(viewsets.ModelViewSet):
         
         student_class = self.request.query_params.get('class')
         if student_class:
-            queryset = queryset.filter(exam_class=student_class)
+            try:
+                sc = int(student_class)
+                queryset = queryset.filter(exam_class=sc)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         batch_id = self.request.query_params.get('batch')
         if batch_id:
-            queryset = queryset.filter(batch_id=batch_id)
+            try:
+                bid = int(batch_id)
+                queryset = queryset.filter(batch_id=bid)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         search = self.request.query_params.get('search')
         if search:

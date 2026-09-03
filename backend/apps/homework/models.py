@@ -1,3 +1,8 @@
+import os
+import uuid
+
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from apps.batches.models import Batch
 from apps.students.models import Student
@@ -6,6 +11,23 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+ALLOWED_ATTACHMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'txt']
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+def validate_attachment_size(value):
+    if value and value.size > MAX_ATTACHMENT_SIZE:
+        raise ValidationError(f'File size must be ≤ 10 MB (got {value.size // 1024 // 1024} MB).')
+
+
+def homework_attachment_path(instance, filename):
+    # Safe randomized filename to prevent path traversal and collisions
+    ext = os.path.splitext(filename)[1].lower().lstrip('.')
+    if ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
+        ext = 'bin'
+    new_name = f"{uuid.uuid4().hex}.{ext}"
+    return f"homework_submissions/{new_name}"
 
 
 class Homework(models.Model):
@@ -54,7 +76,7 @@ class HomeworkSubmission(models.Model):
     homework = models.ForeignKey(Homework, on_delete=models.CASCADE, related_name='submissions')
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='homework_submissions')
     content = models.TextField(blank=True)
-    attachment = models.FileField(upload_to='homework_submissions/', null=True, blank=True)
+    attachment = models.FileField(upload_to=homework_attachment_path, null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=ALLOWED_ATTACHMENT_EXTENSIONS), validate_attachment_size])
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     submitted_at = models.DateTimeField(null=True, blank=True)
     graded_at = models.DateTimeField(null=True, blank=True)

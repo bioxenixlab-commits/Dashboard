@@ -1,5 +1,8 @@
+import os
 from django.urls import path, include
+from django.conf import settings
 from rest_framework.routers import DefaultRouter
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework_simplejwt.views import TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
@@ -26,10 +29,16 @@ router.register(r'homework', HomeworkViewSet, basename='homework')
 router.register(r'attendance', AttendanceViewSet, basename='attendance')
 router.register(r'stats', StatsViewSet, basename='stats')
 
+def _docs_permission():
+    # In production (DEBUG=False), restrict docs to admin; in dev, allow authenticated
+    if not settings.DEBUG:
+        return [IsAdminUser]
+    return [IsAuthenticated]
+
 urlpatterns = [
     path('api/', include(router.urls)),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path('api/schema/', SpectacularAPIView.as_view(permission_classes=_docs_permission()), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema', permission_classes=_docs_permission()), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema', permission_classes=_docs_permission()), name='redoc'),
 ]

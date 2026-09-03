@@ -335,7 +335,6 @@ export function PaymentsTab() {
                       ssc_session: 0,
                       payment_start_month: 1,
                       payment_start_year: selectedYear,
-                      password: '',
                       address: '',
                       parent_name: '',
                       parent_phone: '',

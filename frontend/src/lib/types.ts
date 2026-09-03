@@ -34,7 +34,6 @@ export interface Student {
   batch_id: number | null
   payment_start_month: number
   payment_start_year: number
-  password: string
   address: string
   parent_name: string
   parent_phone: string
@@ -42,6 +41,7 @@ export interface Student {
   is_active: boolean
   unpaid_months_count: number
   overall_percentage: number
+  new_password?: string
 }
 
 export interface Payment {
