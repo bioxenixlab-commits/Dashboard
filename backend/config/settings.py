@@ -74,27 +74,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 ASGI_APPLICATION = 'config.asgi.application'
 
-# Prefer DATABASE_URL (Neon/Railway/Render). Fallback to individual POSTGRES_* (no real defaults).
 DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
-    import dj_database_url
-    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
-else:
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', ''),
-        'USER': os.environ.get('POSTGRES_USER', ''),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
-        'HOST': os.environ.get('POSTGRES_HOST', ''),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-        'OPTIONS': {
-            'sslmode': 'require',
-        } if os.environ.get('POSTGRES_HOST') else {},
-    }
-    if not DATABASES['default']['NAME'] or not DATABASES['default']['USER']:
-        # Allow local Docker Compose to set via env; otherwise fail loud
-        if os.environ.get('DEBUG', 'False').lower() != 'true':
-            raise ValueError("DATABASE_URL or POSTGRES_* must be set")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is required")
+
+import dj_database_url
+DATABASES = {
+    'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
