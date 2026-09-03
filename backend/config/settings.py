@@ -4,9 +4,15 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key-change-in-production')
+# SECURITY: fail loudly if SECRET_KEY not set in production
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    if os.environ.get('DEBUG', 'False').lower() == 'true':
+        SECRET_KEY = 'dev-secret-key-change-in-production'
+    else:
+        raise ValueError("DJANGO_SECRET_KEY must be set via environment variable in production")
 
-DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.railway.app,.vercel.app').split(',')
 
@@ -68,24 +74,27 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 ASGI_APPLICATION = 'config.asgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'neondb'),
-        'USER': os.environ.get('POSTGRES_USER', 'neondb_owner'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'npg_uk7xCwMUe3oQ'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'ep-bold-base-aymswgj9-pooler.c-5.us-east-2.aws.neon.tech'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-        'OPTIONS': {
-            'sslmode': 'require',
-        },
-    }
-}
-
+# Prefer DATABASE_URL (Neon/Railway/Render). Fallback to individual POSTGRES_* (no real defaults).
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
     import dj_database_url
     DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+else:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', ''),
+        'USER': os.environ.get('POSTGRES_USER', ''),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+        'HOST': os.environ.get('POSTGRES_HOST', ''),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        'OPTIONS': {
+            'sslmode': 'require',
+        } if os.environ.get('POSTGRES_HOST') else {},
+    }
+    if not DATABASES['default']['NAME'] or not DATABASES['default']['USER']:
+        # Allow local Docker Compose to set via env; otherwise fail loud
+        if os.environ.get('DEBUG', 'False').lower() != 'true':
+            raise ValueError("DATABASE_URL or POSTGRES_* must be set")
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

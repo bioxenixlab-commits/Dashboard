@@ -45,10 +45,12 @@ class Student(models.Model):
         if not self.password:
             return False
         # Legacy plaintext fallback: if stored value is not a hash, do direct compare then migrate on success
-        if not self.password.startswith('pbkdf2_sha256$'):
-            # Check if hash detection for other algorithms (argon2, etc.) - generic check for $ pattern
-            if self.password.count('$') < 3:
-                return self.password == raw_password
+        if not self.password.startswith('pbkdf2_sha256$') and self.password.count('$') < 3:
+            if self.password == raw_password:
+                self.set_student_password(raw_password)
+                self.save(update_fields=['password'])
+                return True
+            return False
         return check_password(raw_password, self.password)
 
     def save(self, *args, **kwargs):
