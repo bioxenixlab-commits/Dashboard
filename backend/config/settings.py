@@ -71,11 +71,11 @@ ASGI_APPLICATION = 'config.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'neondb'),
-        'USER': os.environ.get('POSTGRES_USER', 'neondb_owner'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'npg_uk7xCwMUe3oQ'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'ep-bold-base-aymswgj9-pooler.c-5.us-east-2.aws.neon.tech'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        'NAME': os.environ.get('POSTGRES_DB', ''),
+        'USER': os.environ.get('POSTGRES_USER', ''),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+        'HOST': os.environ.get('POSTGRES_HOST', ''),
+        'PORT': os.environ.get('POSTGRES_PORT', ''),
         'OPTIONS': {
             'sslmode': 'require',
         },
