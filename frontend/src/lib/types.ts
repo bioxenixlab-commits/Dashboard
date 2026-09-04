@@ -21,6 +21,13 @@ export interface Batch {
   updated_at: string
 }
 
+export interface School {
+  id: number
+  name: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Student {
   id: number
   student_id: string
@@ -32,6 +39,9 @@ export interface Student {
   ssc_session: number
   batch: Batch | null
   batch_id: number | null
+  school: School | null
+  school_id: number | null
+  school_name?: string
   payment_start_month: number
   payment_start_year: number
   address: string

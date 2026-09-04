@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, Filter, Edit, Trash2, Key, X, ChevronDown } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Student, Batch, PaginatedResponse } from '@/lib/types'
+import { Student, Batch, School, PaginatedResponse } from '@/lib/types'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Input'
@@ -39,18 +39,20 @@ export function StudentsTab() {
   const [search, setSearch] = useState('')
   const [selectedClass, setSelectedClass] = useState<number | ''>('')
   const [selectedBatch, setSelectedBatch] = useState<number | ''>('')
+  const [selectedSchool, setSelectedSchool] = useState<number | ''>('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ student: Student; onConfirm: () => void } | null>(null)
 
   // Fetch students
   const { data: studentsData, isLoading } = useQuery<PaginatedResponse<Student>>({
-    queryKey: ['students', { search, class: selectedClass, batch: selectedBatch }],
+    queryKey: ['students', { search, class: selectedClass, batch: selectedBatch, school: selectedSchool }],
     queryFn: async () => {
       const params = new URLSearchParams()
       if (search) params.append('search', search)
       if (selectedClass) params.append('class', selectedClass.toString())
       if (selectedBatch) params.append('batch', selectedBatch.toString())
+      if (selectedSchool) params.append('school', selectedSchool.toString())
       const response = await api.get(`/students/?${params.toString()}`)
       return response.data
     },
@@ -69,6 +71,16 @@ export function StudentsTab() {
   // Filtered for the filter dropdown (show only batches of selected class)
   const batches = selectedClass ? allBatches.filter((b: Batch) => b.student_class === selectedClass) : allBatches
 
+  // Fetch schools for filter + modal
+  const { data: schoolsData } = useQuery({
+    queryKey: ['schools', 'all'],
+    queryFn: async () => {
+      const response = await api.get(`/schools/`)
+      return Array.isArray(response.data) ? response.data : response.data.results || response.data || []
+    },
+  })
+  const allSchools: School[] = Array.isArray(schoolsData) ? schoolsData : []
+
   // Create student mutation
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Student>) => {
@@ -78,6 +90,7 @@ export function StudentsTab() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['students'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
       toastSuccess('Student added successfully')
       setIsModalOpen(false)
       setEditingStudent(null)
@@ -102,6 +115,7 @@ export function StudentsTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] })
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
       toastSuccess('Student updated successfully')
       setIsModalOpen(false)
       setEditingStudent(null)
@@ -180,6 +194,13 @@ export function StudentsTab() {
       )
     },
     { key: 'roll', header: 'Roll' },
+    {
+      key: 'school',
+      header: 'School',
+      render: (student: Student) => (
+        <span className="text-sm">{student.school?.name || <span className="text-gray-400">—</span>}</span>
+      )
+    },
     { key: 'phone', header: 'Phone' },
     { 
       key: 'ssc_session', 
@@ -243,11 +264,11 @@ export function StudentsTab() {
 
       {/* Filters */}
       <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
           <SearchInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, ID, or phone..."
+            placeholder="Search by name, ID, phone or school..."
             className="flex-1 max-w-md"
           />
           <Dropdown
@@ -266,7 +287,13 @@ export function StudentsTab() {
             onChange={(v) => setSelectedBatch(v as number | '')}
             placeholder="Filter by Batch"
             className="w-48"
-            
+          />
+          <Dropdown
+            options={[{ value: '', label: 'All Schools' }, ...allSchools.map((s: School) => ({ value: s.id, label: s.name }))]}
+            value={selectedSchool}
+            onChange={(v) => setSelectedSchool(v as number | '')}
+            placeholder="Filter by School"
+            className="w-52"
           />
         </div>
       </Card>
@@ -312,6 +339,7 @@ export function StudentsTab() {
         onClose={() => { setIsModalOpen(false); setEditingStudent(null); }}
         student={editingStudent}
         batches={allBatches}
+        schools={allSchools}
         onSubmit={(data) => editingStudent ? updateMutation.mutate({ id: editingStudent.id, data }) : createMutation.mutate(data)}
         isLoading={createMutation.isPending || updateMutation.isPending}
       />

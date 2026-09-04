@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { X, Loader2 } from 'lucide-react'
-import { Student, Batch } from '@/lib/types'
+import { Student, Batch, School } from '@/lib/types'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Input'
@@ -18,6 +18,8 @@ const studentSchema = z.object({
   roll: z.number().min(1, 'Roll number is required'),
   ssc_session: z.number().min(20).max(99),
   batch_id: z.number().nullable().optional(),
+  school_id: z.number().nullable().optional(),
+  school_name: z.string().optional(),
   payment_start_month: z.number().min(1).max(12),
   payment_start_year: z.number().min(2020).max(2030),
   address: z.string().optional(),
@@ -32,6 +34,7 @@ interface StudentFormModalProps {
   onClose: () => void
   student: Student | null
   batches: Batch[]
+  schools: School[]
   onSubmit: (data: StudentFormData) => void
   isLoading: boolean
 }
@@ -59,11 +62,13 @@ export function StudentFormModal({
   isOpen, 
   onClose, 
   student, 
-  batches, 
+  batches,
+  schools,
   onSubmit, 
   isLoading 
 }: StudentFormModalProps) {
   const [selectedClass, setSelectedClass] = useState<number>(6)
+  const [showNewSchoolInput, setShowNewSchoolInput] = useState(false)
   const filteredBatches = batches.filter(b => b.student_class === selectedClass)
 
   const {
@@ -98,6 +103,8 @@ export function StudentFormModal({
           roll: student.roll,
           ssc_session: student.ssc_session,
           batch_id: student.batch_id || null,
+          school_id: student.school_id || null,
+          school_name: '',
           payment_start_month: student.payment_start_month,
           payment_start_year: student.payment_start_year,
           address: student.address,
@@ -105,6 +112,7 @@ export function StudentFormModal({
           parent_phone: student.parent_phone,
         })
         setSelectedClass(student.student_class)
+        setShowNewSchoolInput(false)
       } else {
         reset({
           name: '',
@@ -113,6 +121,8 @@ export function StudentFormModal({
           roll: 1,
           ssc_session: 27,
           batch_id: null,
+          school_id: null,
+          school_name: '',
           payment_start_month: 1,
           payment_start_year: currentYear,
           address: '',
@@ -120,6 +130,7 @@ export function StudentFormModal({
           parent_phone: '',
         })
         setSelectedClass(6)
+        setShowNewSchoolInput(false)
       }
     }
   }, [isOpen, student, reset])
@@ -134,11 +145,36 @@ export function StudentFormModal({
     setValue('batch_id', value || undefined)
   }
 
+  const handleSchoolChange = (value: number | null) => {
+    if (value) {
+      setValue('school_id', value)
+      setValue('school_name', '')
+      setShowNewSchoolInput(false)
+    } else {
+      setValue('school_id', null)
+    }
+  }
+
+  const handleNewSchoolToggle = () => {
+    if (!showNewSchoolInput) {
+      setValue('school_id', null)
+      setValue('school_name', '')
+    }
+    setShowNewSchoolInput(!showNewSchoolInput)
+  }
+
   const onFormSubmit = (data: StudentFormData) => {
-    onSubmit({
+    const payload: StudentFormData = {
       ...data,
       batch_id: data.batch_id || null,
-    })
+      school_id: data.school_name?.trim() ? null : (data.school_id || null),
+      school_name: data.school_name?.trim() || undefined,
+    }
+    // If new school name provided, don't send school_id
+    if (payload.school_name) {
+      payload.school_id = null
+    }
+    onSubmit(payload)
   }
 
   return (
@@ -211,6 +247,48 @@ export function StudentFormModal({
             </Select>
             <p className="mt-1 text-xs text-gray-400">Only shows batches for selected class</p>
           </div>
+        </div>
+
+        {/* School field - dropdown + add new */}
+        <div className="space-y-2">
+          <Label htmlFor="school_id">School</Label>
+          {!showNewSchoolInput ? (
+            <>
+              <div className="flex gap-2">
+                <Select
+                  id="school_id"
+                  onChange={(e) => handleSchoolChange(e.target.value ? Number(e.target.value) : null)}
+                  value={watch('school_id') || ''}
+                  className="flex-1"
+                >
+                  <option value="">Select School (Optional)</option>
+                  {schools.map((school) => (
+                    <option key={school.id} value={school.id}>{school.name}</option>
+                  ))}
+                </Select>
+                <Button type="button" variant="secondary" onClick={handleNewSchoolToggle} className="whitespace-nowrap">
+                  + New
+                </Button>
+              </div>
+              <p className="text-xs text-gray-400">Choose from existing schools or click + New to add a school</p>
+            </>
+          ) : (
+            <>
+              <div className="flex gap-2">
+                <Input
+                  id="school_name"
+                  {...register('school_name')}
+                  placeholder="Enter new school name"
+                  className="flex-1"
+                  autoFocus
+                />
+                <Button type="button" variant="secondary" onClick={handleNewSchoolToggle}>
+                  Cancel
+                </Button>
+              </div>
+              <p className="text-xs text-gray-400">New school will be created automatically. Or cancel to pick from dropdown.</p>
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

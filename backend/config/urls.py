@@ -7,7 +7,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 from apps.accounts.views import TeacherAuthViewSet, StudentAuthViewSet
-from apps.students.views import StudentViewSet
+from apps.students.views import StudentViewSet, SchoolViewSet
 from apps.batches.views import BatchViewSet
 from apps.payments.views import PaymentViewSet
 from apps.exams.views import ExamViewSet, ExamResultViewSet
@@ -20,6 +20,7 @@ router = DefaultRouter()
 router.register(r'auth/teacher', TeacherAuthViewSet, basename='teacher-auth')
 router.register(r'auth/student', StudentAuthViewSet, basename='student-auth')
 router.register(r'students', StudentViewSet, basename='student')
+router.register(r'schools', SchoolViewSet, basename='school')
 router.register(r'batches', BatchViewSet, basename='batch')
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'exams', ExamViewSet, basename='exam')

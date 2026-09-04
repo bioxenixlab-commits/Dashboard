@@ -8,6 +8,19 @@ from django.conf import settings
 from apps.batches.models import Batch
 
 
+class School(models.Model):
+    name = models.CharField(max_length=200, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        db_table = 'students_school'
+
+    def __str__(self):
+        return self.name
+
+
 class Student(models.Model):
     CLASS_CHOICES = settings.CLASS_CHOICES
 
@@ -18,6 +31,7 @@ class Student(models.Model):
     roll = models.IntegerField()
     ssc_session = models.IntegerField(help_text="Year when student will be in Class 10+1 (e.g., 27 for 2027)")
     batch = models.ForeignKey(Batch, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
+    school = models.ForeignKey(School, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
     payment_start_month = models.IntegerField(default=1, help_text="Month to start collecting fees (1-12)")
     payment_start_year = models.IntegerField(default=timezone.now().year, help_text="Year to start collecting fees")
     password = models.CharField(max_length=128, help_text="Hashed with Django's password hasher; use set_student_password()")
@@ -29,7 +43,6 @@ class Student(models.Model):
 
     class Meta:
         ordering = ['student_class', 'roll']
-        unique_together = ['student_class', 'roll']
         db_table = 'students_student'
 
     def __str__(self):

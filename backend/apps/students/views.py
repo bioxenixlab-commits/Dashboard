@@ -5,20 +5,37 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, Count
 from django.db import transaction
 
-from .models import Student
+from .models import Student, School
 from .serializers import (
     StudentSerializer, StudentListSerializer, StudentCreateSerializer,
-    StudentUpdateSerializer, StudentPasswordResetSerializer, StudentSearchSerializer
+    StudentUpdateSerializer, StudentPasswordResetSerializer, StudentSearchSerializer,
+    SchoolSerializer
 )
 from apps.batches.models import Batch
 from apps.accounts.permissions import IsTeacher
 
 
-class StudentViewSet(viewsets.ModelViewSet):
-    queryset = Student.objects.filter(is_active=True).select_related('batch')
+class SchoolViewSet(viewsets.ModelViewSet):
+    queryset = School.objects.all()
+    serializer_class = SchoolSerializer
     permission_classes = [IsAuthenticated, IsTeacher]
-    filterset_fields = ['student_class', 'batch', 'is_active']
-    search_fields = ['name', 'student_id', 'phone', 'parent_name', 'parent_phone']
+    search_fields = ['name']
+    ordering = ['name']
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+        return queryset
+
+
+class StudentViewSet(viewsets.ModelViewSet):
+    queryset = Student.objects.filter(is_active=True).select_related('batch', 'school')
+    permission_classes = [IsAuthenticated, IsTeacher]
+    filterset_fields = ['student_class', 'batch', 'school', 'is_active']
+    search_fields = ['name', 'student_id', 'phone', 'parent_name', 'parent_phone', 'school__name']
     ordering_fields = ['student_class', 'roll', 'name', 'date_added']
     ordering = ['student_class', 'roll']
 
@@ -51,6 +68,15 @@ class StudentViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(batch_id=bid)
             except (ValueError, TypeError):
                 return queryset.none()
+
+        # Filter by school
+        school_id = self.request.query_params.get('school')
+        if school_id:
+            try:
+                sid = int(school_id)
+                queryset = queryset.filter(school_id=sid)
+            except (ValueError, TypeError):
+                return queryset.none()
         
         # Global search
         search = self.request.query_params.get('search')
@@ -58,7 +84,8 @@ class StudentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(
                 Q(name__icontains=search) |
                 Q(student_id__icontains=search) |
-                Q(phone__icontains=search)
+                Q(phone__icontains=search) |
+                Q(school__name__icontains=search)
             )
         
         return queryset
@@ -67,8 +94,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # Generate secure temporary password for new student
-        temp_student = Student(**{k: v for k, v in serializer.validated_data.items() if k != 'batch'})
-        # Handle batch separately if present
+        temp_student = Student(**{k: v for k, v in serializer.validated_data.items() if k not in ('batch', 'school')})
+        # Handle batch/school separately if present
         raw = temp_student.generate_password()
         student = serializer.save()
         student.set_student_password(raw)
