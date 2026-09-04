@@ -68,7 +68,6 @@ export function StudentFormModal({
   isLoading 
 }: StudentFormModalProps) {
   const [selectedClass, setSelectedClass] = useState<number>(6)
-  const [showNewSchoolInput, setShowNewSchoolInput] = useState(false)
   const filteredBatches = batches.filter(b => b.student_class === selectedClass)
 
   const {
@@ -112,7 +111,6 @@ export function StudentFormModal({
           parent_phone: student.parent_phone,
         })
         setSelectedClass(student.student_class)
-        setShowNewSchoolInput(false)
       } else {
         reset({
           name: '',
@@ -130,7 +128,6 @@ export function StudentFormModal({
           parent_phone: '',
         })
         setSelectedClass(6)
-        setShowNewSchoolInput(false)
       }
     }
   }, [isOpen, student, reset])
@@ -148,31 +145,21 @@ export function StudentFormModal({
   const handleSchoolChange = (value: number | null) => {
     if (value) {
       setValue('school_id', value)
+      // clear new school input when picking from dropdown
       setValue('school_name', '')
-      setShowNewSchoolInput(false)
     } else {
       setValue('school_id', null)
     }
   }
 
-  const handleNewSchoolToggle = () => {
-    if (!showNewSchoolInput) {
-      setValue('school_id', null)
-      setValue('school_name', '')
-    }
-    setShowNewSchoolInput(!showNewSchoolInput)
-  }
-
   const onFormSubmit = (data: StudentFormData) => {
+    const trimmedNew = data.school_name?.trim()
     const payload: StudentFormData = {
       ...data,
       batch_id: data.batch_id || null,
-      school_id: data.school_name?.trim() ? null : (data.school_id || null),
-      school_name: data.school_name?.trim() || undefined,
-    }
-    // If new school name provided, don't send school_id
-    if (payload.school_name) {
-      payload.school_id = null
+      // if new school typed, ignore dropdown selection
+      school_id: trimmedNew ? null : (data.school_id || null),
+      school_name: trimmedNew || undefined,
     }
     onSubmit(payload)
   }
@@ -250,45 +237,35 @@ export function StudentFormModal({
         </div>
 
         {/* School field - dropdown + add new */}
-        <div className="space-y-2">
-          <Label htmlFor="school_id">School</Label>
-          {!showNewSchoolInput ? (
-            <>
-              <div className="flex gap-2">
-                <Select
-                  id="school_id"
-                  onChange={(e) => handleSchoolChange(e.target.value ? Number(e.target.value) : null)}
-                  value={watch('school_id') || ''}
-                  className="flex-1"
-                >
-                  <option value="">Select School (Optional)</option>
-                  {schools.map((school) => (
-                    <option key={school.id} value={school.id}>{school.name}</option>
-                  ))}
-                </Select>
-                <Button type="button" variant="secondary" onClick={handleNewSchoolToggle} className="whitespace-nowrap">
-                  + New
-                </Button>
-              </div>
-              <p className="text-xs text-gray-400">Choose from existing schools or click + New to add a school</p>
-            </>
-          ) : (
-            <>
-              <div className="flex gap-2">
-                <Input
-                  id="school_name"
-                  {...register('school_name')}
-                  placeholder="Enter new school name"
-                  className="flex-1"
-                  autoFocus
-                />
-                <Button type="button" variant="secondary" onClick={handleNewSchoolToggle}>
-                  Cancel
-                </Button>
-              </div>
-              <p className="text-xs text-gray-400">New school will be created automatically. Or cancel to pick from dropdown.</p>
-            </>
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="school_id">School (select existing)</Label>
+            <Select
+              id="school_id"
+              onChange={(e) => handleSchoolChange(e.target.value ? Number(e.target.value) : null)}
+              value={watch('school_id') || ''}
+            >
+              <option value="">Select School (Optional)</option>
+              {schools.map((school) => (
+                <option key={school.id} value={school.id}>{school.name}</option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-gray-400">{schools.length ? `${schools.length} schools available` : 'No schools yet — add one on the right'}</p>
+          </div>
+          <div>
+            <Label htmlFor="school_name">Or add new school</Label>
+            <Input
+              id="school_name"
+              {...register('school_name')}
+              placeholder="Type new school name"
+              onChange={(e) => {
+                const v = e.target.value
+                setValue('school_name', v)
+                if (v.trim()) setValue('school_id', null)
+              }}
+            />
+            <p className="mt-1 text-xs text-gray-400">If typed, this creates a new school and assigns it</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -22,6 +22,7 @@ class SchoolViewSet(viewsets.ModelViewSet):
     search_fields = ['name']
     ordering = ['name']
     pagination_class = None
+    http_method_names = ['get', 'post', 'head', 'options']  # no delete/put/patch - schools are stored only
 
     def get_queryset(self):
         queryset = super().get_queryset()
