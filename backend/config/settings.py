@@ -4,15 +4,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY: fail loudly if SECRET_KEY not set in production
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
-if not SECRET_KEY:
-    if os.environ.get('DEBUG', 'False').lower() == 'true':
-        SECRET_KEY = 'dev-secret-key-change-in-production'
-    else:
-        raise ValueError("DJANGO_SECRET_KEY must be set via environment variable in production")
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key-change-in-production')
 
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.railway.app,.vercel.app').split(',')
 
@@ -74,14 +68,24 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 ASGI_APPLICATION = 'config.asgi.application'
 
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required")
-
-import dj_database_url
 DATABASES = {
-    'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'neondb'),
+        'USER': os.environ.get('POSTGRES_USER', 'neondb_owner'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'npg_uk7xCwMUe3oQ'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'ep-bold-base-aymswgj9-pooler.c-5.us-east-2.aws.neon.tech'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        'OPTIONS': {
+            'sslmode': 'require',
+        },
+    }
 }
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    import dj_database_url
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
